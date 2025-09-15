@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>uGo-Man Viewer</title>
+  <style>
+    html,
+    body {
+      margin: 0;
+      height: 100%;
+    }
+
+    #viewer {
+      position: fixed;
+      inset: 0;
+      /* ← これで画面いっぱいに固定 */
+      background: #000;
+
+    }
+
+    /* モバイルの青ハイライトを消す（タップ操作は生きる） */
+    #viewer {
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    #viewer img {
+      max-width: 100%;
+      max-height: 100%;
+      width: auto;
+      height: auto;
+      display: block;
+      margin: auto;
+    }
+
+    /* 画像・オーバーレイだけ選択禁止（テキストや他UIは許可） */
+    #viewer img,
+    #viewer .overlay,
+    #viewer .marker {
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-user-drag: none;
+    }
+
+    ::selection {
+      background: transparent;
+    }
+
+    /* クリック判定用ホットスポット（常時表示） */
+    #viewer .hotspot {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 3;
+      /* 画像の上、動画表示レイヤの下でもOK */
+      background: transparent;
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-user-drag: none;
+      cursor: pointer;
+    }
+
+    /* 動画表示レイヤ（初期は非表示） */
+    #viewer .overlay {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      display: none;
+      overflow: visible;
+      /* clip-pathで切るので可視に */
+      z-index: 4;
+      /* ホットスポットより上 */
+    }
+
+    #viewer .marker {
+      position: absolute;
+      z-index: 5;
+      pointer-events: none;
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-user-drag: none;
+    }
+
+    #viewer .marker .dot {
+      width: var(--dot-size, 12px);
+      height: var(--dot-size, 12px);
+      background: #000;
+      /* 中は黒 */
+      outline: 1px solid #fff;
+      /* 白フチ線（太さは2pxで調整可） */
+      border-radius: 0;
+      /* 完全な■。丸くしたければ数値入れる */
+      margin-bottom: var(--dot-gap, 9px);
+    }
+
+    /* トップページ用ヘルプ */
+    /* 起動時の上下2分割コンテナ */
+    #container {
+      position: fixed;
+      inset: 0;
+      /* 画面いっぱい */
+      display: flex;
+      flex-direction: column;
+      /* 上下に分割 */
+      z-index: 10;
+      /* viewer（背景）より前面 */
+    }
+
+    #help {
+
+      min-height: 0;
+      display: flex;
+      justify-content: center;
+    }
+
+    #help .card {
+      max-width: 90%;
+      margin: 20px;
+      /* ← ここで上下左右に余白を入れる */
+      padding: 16px 20px;
+      color: #fff;
+      font: 14px/1.6 system-ui, -apple-system, Segoe UI, Roboto;
+
+      background: rgba(0, 0, 0, 0.55);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      border-radius: 10px;
+      backdrop-filter: blur(4px);
+      text-align: center;
+      overflow-y: scroll;
+    }
+
+    #help .card h3 {
+      margin: 0 0 8px;
+      font-size: 16px;
+    }
+
+
+    #bottom {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    #btn {
+      width: 200px;
+      height: 48px;
+      padding: 0 16px;
+      box-sizing: border-box;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      border: 1px solid #888;
+      border-radius: 6px;
+      background: #fff;
+      cursor: pointer;
+      user-select: none;
+      font: 14px system-ui;
+      line-height: 1;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="container">
+    <div id="help">
+      <div class="card">
+        <h3>うごマンビューアの使い方</h3>
+        <p>「<b>フォルダを選ぶ</b>」をタップし、<b>作品名のフォルダ</b>を指定してください。</p>
+        <p style="color: red; font-weight: bold;">※index.htmlがあるフォルダです。</p>
+        <p>ブラウザのファイルアクセス許可をし、「アップロード」を選択します。</p>
+        <p><small>※「アップロード」と表示されますが、ローカル処理でありネット接続は不要です。</small></p>
+      </div>
+    </div>
+    <div id="bottom">
+      <label id="btn" for="pick">フォルダを選ぶ</label>
+    </div>
+  </div>
+
+  <div id="viewer" data-mode="single"></div>
+  <input id="pick" type="file" webkitdirectory multiple style="display:none">
+
+
+
+  <script>
+    (() => {
+      // --- i18n（自動判定：ja系なら日本語、その他は英語） ---
+      const lang = navigator.language || navigator.userLanguage || "en";
+      const cur = /^ja\b/i.test(lang) ? "ja" : "en";
+
+      const I18N = {
+        ja: {
+          title: "うごマンビューアの使い方",
+          line1: "「フォルダを選ぶ」をタップし、<b>作品名のフォルダ</b>を指定してください。",
+          line2: "※index.htmlがあるフォルダです。",
+          line3: "ブラウザのファイルアクセス許可をし、「アップロード」を選択します。",
+          line4:
+            "※「アップロード」と表示されますが、ローカル処理でありネット接続は不要です。",
+          selectBtn: "フォルダを選ぶ",
+        },
+        en: {
+          title: "How to use uGo-Man Viewer",
+          line1:
+            'Tap "<b>Select Folder</b>" and choose the <b>work\'s folder</b>.',
+          line2: "※This is the folder that contains index.html.",
+          line3:
+            'Allow the browser’s file access prompt and choose "Upload".',
+          line4:
+            '※Although “Upload” is displayed, it is processed locally and no network connection is required.',
+          selectBtn: "Select Folder",
+        },
+      };
+
+      // body 内だけ上書き
+      const card = document.querySelector("#help .card");
+      const btn = document.getElementById("btn");
+
+      if (card) {
+        card.innerHTML = `
+        <h3>${I18N[cur].title}</h3>
+        <p>${I18N[cur].line1}</p>
+        <p style="color: red; font-weight: bold;">${I18N[cur].line2}</p>
+        <p>${I18N[cur].line3}</p>
+        <p><small>${I18N[cur].line4}</small></p>
+      `;
+      }
+      if (btn) btn.textContent = I18N[cur].selectBtn;
+      // ★ 追加：一度だけ出すアラート
+      const panicOnce = (() => {
+        let fired = false, bucket = [];
+        return (msg, immediateStop = false) => {
+          if (msg) bucket.push(String(msg));
+          if (!fired) {
+            fired = true;
+            setTimeout(() => {
+              if (bucket.length) alert(bucket.join("\n"));
+              bucket = [];
+            }, 0);
+          }
+          if (immediateStop) throw new Error("panicOnce-stop");
+        };
+      })();
+
+      // ★ 追加：簡易画像プレースホルダ（同期・dataURL）
+      function makeImagePlaceholderDataURL(label = "MISSING", w = 800, h = 1200) {
+        const c = document.createElement("canvas");
+        c.width = w; c.height = h;
+        const g = c.getContext("2d");
+        g.fillStyle = "#222"; g.fillRect(0, 0, w, h);
+        g.fillStyle = "#fff";
+        g.font = "bold " + Math.round(w * 0.05) + "px system-ui";
+        g.textAlign = "center"; g.textBaseline = "middle";
+        g.fillText(label, w / 2, h / 2);
+        return c.toDataURL("image/png");
+      }
+
+      const ORDER = [
+        "z_assets/js/data.js",
+        "z_assets/js/utils.js",
+        "z_assets/js/playback.js",
+        "z_assets/js/overlays.js",
+        "z_assets/js/layout.js",
+        "z_assets/js/modeui.js",
+        "z_assets/js/main.js"
+      ];
+      const isHttp = /^https?:$/.test(location.protocol);
+      const isFile = location.protocol === "file:";
+
+      // PC判定（Windows / macOS / Linux デスクトップ）
+      const isPC = /(Windows|Macintosh|Linux x86_64)/i.test(navigator.userAgent);
+
+      // direct 読み込みできる条件
+      const useDirect = (isHttp || isFile) && isPC;
+
+
+      const loadScript = (src, cb) => {
+        const s = document.createElement("script");
+        s.src = src; s.onload = cb; s.onerror = cb; document.head.appendChild(s);
+      };
+
+      if (useDirect) {
+        const container = document.getElementById("container");
+        if (container) container.style.display = "none";
+
+        // 残りのJSを順次ロード（data.js 読了済み or 埋め込み時は i=1 から）
+        const startSeq = (i0 = 1) => {
+          (function seq(i = i0) {
+            if (i >= ORDER.length) return;
+            const s = document.createElement("script");
+            s.src = ORDER[i];
+            s.onload = () => seq(i + 1);
+            s.onerror = () => {
+              alert(ORDER[i] + " が見つかりません。フォルダ構成を確認してください。");
+            };
+            document.head.appendChild(s);
+          })();
+        };
+
+        // すでに __UGOMAN_DATA__ が埋め込み済みなら data.js を読まずに続行
+        if (window.__UGOMAN_DATA__) {
+          startSeq(1);
+          return;
+        }
+
+        // data.js を z_assets/js → 直下 data.js の順で試す
+        const tryDataJs = (src, onok, onerr) => {
+          const s = document.createElement("script");
+          s.src = src;
+          s.onload = onok;
+          s.onerror = onerr;
+          document.head.appendChild(s);
+        };
+
+        tryDataJs(
+          "z_assets/js/data.js",
+          () => startSeq(1),
+          () => tryDataJs(
+            "data.js",
+            () => startSeq(1),
+            () => alert("data.js が見つかりません。フォルダ構成を確認してください。")
+          )
+        );
+        return;
+      }
+
+
+      // Android: フォルダ選択 → blob 実行
+      const pick = document.getElementById("pick");
+      const container = document.getElementById("container");
+
+      pick.addEventListener("change", () => {
+        if (container) container.style.display = "none";
+
+        const map = new Map();
+        for (const f of pick.files) {
+          const path = f.webkitRelativePath.replace(/\\/g, "/");
+          map.set(path, f);
+        }
+
+        const findFile = (expectedPath) => {
+          const target = expectedPath.replace(/\\/g, "/");
+          for (const [k, v] of map.entries()) {
+            if (k.replace(/\\/g, "/").endsWith(target)) return v;
+          }
+          return null;
+        };
+
+        const loadBlobScript = (file, cb) => {
+          const url = URL.createObjectURL(file);
+          const s = document.createElement("script");
+          s.src = url;
+          s.onload = () => { URL.revokeObjectURL(url); cb && cb(); };
+          s.onerror = () => { URL.revokeObjectURL(url); cb && cb(); };
+          document.head.appendChild(s);
+        };
+
+        // 1) data.js 実行（未検出でもアラートは1回） ← ここから丸ごと置換
+
+        // 公開: 相対→blob 変換器（埋め込み/外部どちらでも使う）
+        window.__UGO_RESOLVE = (relPath, sink) => {
+          if (!relPath) return relPath;
+          const f = findFile(relPath);
+          if (f) {
+            const u = URL.createObjectURL(f);
+            if (Array.isArray(sink)) sink.push(u);
+            return u;
+          } else {
+            // 画像拡張子なら即席プレースホルダにフォールバック（動画は空文字）
+            const lower = String(relPath).toLowerCase();
+            const isImg = /\.(png|jpe?g|webp|gif)$/i.test(lower);
+            if (isImg) {
+              const u = makeImagePlaceholderDataURL("MISSING: " + relPath);
+              if (Array.isArray(sink)) sink.push(u);
+              panicOnce("画像が見つかりません: " + relPath);
+              return u; // dataURL
+            } else {
+              panicOnce("アセットが見つかりません: " + relPath);
+              return ""; // 空
+            }
+          }
+        };
+
+        // 候補から最初に見つかった方を返す
+        const findFirst = (candidates) => {
+          for (const c of candidates) {
+            const f = findFile(c);
+            if (f) return f;
+          }
+          return null;
+        };
+
+        // 残りのJSを順次ロード（data.js 読了済み or 埋め込み時は i=1 から）
+        const startSeq = () => {
+          (function seq(i = 1) {
+            if (i >= ORDER.length) return;
+            const jsFile = findFile(ORDER[i]);
+            if (!jsFile) {
+              panicOnce(ORDER[i] + " が見つかりません。選択フォルダ内にJSが揃っているか確認してください。", true);
+              return;
+            }
+            loadBlobScript(jsFile, () => seq(i + 1));
+          })();
+        };
+
+        // __UGOMAN_DATA__ が index.html に埋め込み済みなら data.js をスキップ
+        if (window.__UGOMAN_DATA__) {
+          startSeq();
+        } else {
+          // data.js を z_assets/js → 直下 data.js の順で探索
+          const dataFile = findFirst(["z_assets/js/data.js", "data.js"]);
+          if (!dataFile) {
+            panicOnce("data.js が見つかりません。選択フォルダ構成を確認してください。", true);
+          } else {
+            loadBlobScript(dataFile, startSeq);
+          }
+        }
+
+      }, { once: true });
+    })();
+  </script>
+</body>
+
+</html>
