@@ -6,6 +6,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>uGo-Man Viewer</title>
   <style>
+    html {
+      -webkit-text-size-adjust: 100%;
+      text-size-adjust: 100%;
+    }
+
     html,
     body {
       margin: 0;
@@ -130,27 +135,46 @@
       border: 1px solid rgba(255, 255, 255, 0.25);
       border-radius: 10px;
       backdrop-filter: blur(4px);
-      text-align: center;
+      text-align: left;
       overflow-y: scroll;
     }
 
     #help .card h3 {
+      text-align: center;
       margin: 0 0 8px;
       font-size: 16px;
     }
 
+    #help .card li {
+      font-size: inherit;
+    }
 
     #bottom {
       flex: 1;
       display: flex;
+      flex-direction: column;
       justify-content: center;
       align-items: center;
     }
 
+    #copyBM {
+      padding: 16px;
+      box-sizing: border-box;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      border: 1px solid #888;
+      border-radius: 6px;
+      background: #fff;
+      cursor: pointer;
+      user-select: none;
+      font: 14px system-ui;
+      line-height: 1;
+      margin-bottom: 48px;
+    }
+
     #btn {
-      width: 200px;
-      height: 48px;
-      padding: 0 16px;
+      padding: 16px;
       box-sizing: border-box;
       display: flex;
       justify-content: center;
@@ -167,17 +191,21 @@
 </head>
 
 <body>
+
   <div id="container">
     <div id="help">
       <div class="card">
         <h3>うごマンビューアの使い方</h3>
-        <p>「<b>フォルダを選ぶ</b>」をタップし、<b>作品名のフォルダ</b>を指定してください。</p>
+        <p>「<b>フォルダを選ぶ</b>」をタップし、<b>作品名のフォルダ</b><a href="https://google.com">を指定してください。</a></p>
+        </p>
         <p style="color: red; font-weight: bold;">※index.htmlがあるフォルダです。</p>
         <p>ブラウザのファイルアクセス許可をし、「アップロード」を選択します。</p>
         <p><small>※「アップロード」と表示されますが、ローカル処理でありネット接続は不要です。</small></p>
       </div>
     </div>
     <div id="bottom">
+      <button id="copyBM" style="margin-left:12px" class="btn-like">ブックマークレットをコピー</button>
+
       <label id="btn" for="pick">フォルダを選ぶ</label>
     </div>
   </div>
@@ -189,47 +217,130 @@
 
   <script>
     (() => {
-      // --- i18n（自動判定：ja系なら日本語、その他は英語） ---
-      const lang = navigator.language || navigator.userLanguage || "en";
-      const cur = /^ja\b/i.test(lang) ? "ja" : "en";
-
-      const I18N = {
-        ja: {
-          title: "うごマンビューアの使い方",
-          line1: "「フォルダを選ぶ」をタップし、<b>作品名のフォルダ</b>を指定してください。",
-          line2: "※index.htmlがあるフォルダです。",
-          line3: "ブラウザのファイルアクセス許可をし、「アップロード」を選択します。",
-          line4:
-            "※「アップロード」と表示されますが、ローカル処理でありネット接続は不要です。",
-          selectBtn: "フォルダを選ぶ",
-        },
-        en: {
-          title: "How to use uGo-Man Viewer",
-          line1:
-            'Tap "<b>Select Folder</b>" and choose the <b>work\'s folder</b>.',
-          line2: "※This is the folder that contains index.html.",
-          line3:
-            'Allow the browser’s file access prompt and choose "Upload".',
-          line4:
-            '※Although “Upload” is displayed, it is processed locally and no network connection is required.',
-          selectBtn: "Select Folder",
-        },
-      };
-
-      // body 内だけ上書き
-      const card = document.querySelector("#help .card");
-      const btn = document.getElementById("btn");
-
-      if (card) {
-        card.innerHTML = `
-        <h3>${I18N[cur].title}</h3>
-        <p>${I18N[cur].line1}</p>
-        <p style="color: red; font-weight: bold;">${I18N[cur].line2}</p>
-        <p>${I18N[cur].line3}</p>
-        <p><small>${I18N[cur].line4}</small></p>
-      `;
+      function detectPlatform() {
+        const ua = navigator.userAgent || "";
+        const isiOS = /iPhone|iPad|iPod/i.test(ua) || (/\bMacintosh\b/.test(ua) && navigator.maxTouchPoints > 1);
+        const isAndroid = /Android/i.test(ua);
+        return isiOS ? "ios" : (isAndroid ? "android" : "other");
       }
-      if (btn) btn.textContent = I18N[cur].selectBtn;
+      function renderContainer(platform) {
+        const lang = navigator.language || "en";
+        const cur = /^ja\b/i.test(lang) ? "ja" : "en";
+
+        if (platform === "ios") {
+          return `
+      <div id="help">
+        <div class="card">
+          <h3>${cur === "ja" ? "うごマンビューアの使い方" : "How to use uGo-Man Viewer"}</h3>
+          <ol>
+            <li>${cur === "ja" ? "「ブックマークレットをコピー」をタップ、このページは閉じる"
+              : 'Tap "Copy Bookmarklet", then close this page'}</li>
+            <li>${cur === "ja" ? "Safariで適当なページをブックマーク追加"
+              : "In Safari, add any page to your bookmarks"}</li>
+            <li>${cur === "ja" ? "追加したブクマを編集→既存URLを削除し、ペーストで上書き"
+              : "Edit the new bookmark → delete the existing URL, then paste"}</li>
+            <li>${cur === "ja" ? "保存したブクマをタップし、<span style='color:red;font-weight:bold;'>index.htmlのあるフォルダ</span>を選択"
+              : "Tap the saved bookmark and select the folder that contains <span style='color:red;font-weight:bold;'>index.html</span>"}</li>
+          </ol>
+          <p>${cur === "ja"
+              ? "（※このページ内の「フォルダを選ぶ」は使用しません。詳細は「お読みください」をご参照ください）"
+              : '(※ Do not use the "Select Folder" button on this page. See "Read Me" for details.)'}</p>
+        </div>
+      </div>
+      <div id="bottom">
+        <button id="copyBM" class="btn-like">${cur === "ja" ? "ブックマークレットをコピー" : "Copy Bookmarklet"}</button>
+        <label id="btn" for="pick">${cur === "ja" ? "フォルダを選ぶ" : "Select Folder"}</label>
+      </div>
+    `;
+        } else {
+          return `
+      <div id="help">
+        <div class="card">
+          <h3>${cur === "ja" ? "うごマンビューアの使い方" : "How to use uGo-Man Viewer"}</h3>
+          <p>${cur === "ja"
+              ? "「<b>フォルダを選ぶ</b>」をタップし、<b>作品名のフォルダ</b>を指定してください。"
+              : 'Tap "<b>Select Folder</b>" and choose the <b>work\'s folder</b>.'}</p>
+          <p style="color:red;font-weight:bold;">${cur === "ja"
+              ? "※index.html があるフォルダです。"
+              : "※This is the folder that contains index.html."}</p>
+          <p>${cur === "ja"
+              ? "ブラウザのファイルアクセス許可をし、「アップロード」を選択します。"
+              : 'Allow the browser’s file access prompt and choose "Upload".'}</p>
+          <p><small>${cur === "ja"
+              ? "※「アップロード」と表示されますが、ローカル処理でありネット接続は不要です。"
+              : "※ Although “Upload” is displayed, it is processed locally and no network connection is required."}</small></p>
+        </div>
+      </div>
+      <div id="bottom">
+        <label id="btn" for="pick">${cur === "ja" ? "フォルダを選ぶ" : "Select Folder"}</label>
+      </div>
+    `;
+        }
+      }
+
+      const platform = detectPlatform();
+      const $container = document.getElementById("container");
+      if ($container) {
+        $container.innerHTML = renderContainer(platform);
+      }
+
+      // --- ブックマークレット コピー ---
+      const BOOKMARKLET = "javascript:(()=>{const _blankTab=(()=>{try{const h=location.href||'';const o=(location.origin||'').toLowerCase();const t=(document.title||'').toLowerCase();return!h||/^about:/.test(h)||o==='null'||t==='start page'||t==='新規タブ'||t==='スタートページ';}catch(_){return true}})();if(_blankTab){alert('空白タブでは動作しません。\\nThis bookmarklet cannot run on a blank/start page.');return;}const W=window.open('about:blank','_blank');if(!W){alert('ポップアップがブロックされています。\\nPopup has been blocked.');return;}const D=W.document;D.open();D.write(\"<!doctype html><html lang='ja'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1,viewport-fit=cover'><title>uGo-Man</title><style>html,body{margin:0;height:100%;background:#000;overflow:hidden}#viewer{position:fixed;inset:0;background:#000;z-index:1}#viewer img{  max-width:100%;max-height:100%;display:block;margin:auto;-webkit-user-select:none;user-select:none;-webkit-user-drag:none;}#viewer video{-webkit-user-select:none;user-select:none;-webkit-user-drag:none;}#ui{position:fixed;left:0;right:0;bottom:0;z-index:9999;display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px}#ui button{height:44px;padding:0 14px;border:1px solid #888;border-radius:6px;background:#fff;font:14px system-ui;cursor:pointer}.overlay{position:absolute;left:0;top:0;width:100%;height:100%;display:none;z-index:4}.hotspot{position:absolute;left:0;top:0;width:100%;height:100%;z-index:3;background:transparent;cursor:pointer}.marker{position:absolute;z-index:5;pointer-events:none}.marker .dot{width:var(--dot-size,12px);height:var(--dot-size,12px);background:#000;outline:1px solid #fff;border-radius:0;margin-bottom:var(--dot-gap,9px)}#_ugo_hint{color:#ddd;font:12px/1.4 system-ui;text-align:center;opacity:.95}</style></head><body><div id='viewer'></div><div id='ui'><div id='_ugo_hint'>index.html のあるフォルダを指定してください<br><small>Please select the folder that contains<code>index.html</code>.</small></div><button id='_ugo_pick_btn'>フォルダを選ぶ<br>Select Folder</button></div></body></html>\");D.close();const origCreate=D.createElement.bind(D);D.createElement=(t,...a)=>{const el=origCreate(t,...a);if(String(t).toLowerCase()==='video'){el.setAttribute('playsinline','');el.muted=true;el.preload='metadata';}return el;};(function(){const urlRefs=new Map();function attach(n,u){if(!u||!/^blob:/.test(u))return;let s=urlRefs.get(u);if(!s){s=new Set();urlRefs.set(u,s);}s.add(n);}function detach(n,u){if(!u||!/^blob:/.test(u))return;const s=urlRefs.get(u);if(!s)return;s.delete(n);if(s.size===0){urlRefs.delete(u);try{W.URL.revokeObjectURL(u);}catch(_){}}}function clearNode(n){try{if(n.tagName==='VIDEO'){try{n.pause();}catch(_){}const u=n.currentSrc||n.src||'';detach(n,u);n.removeAttribute('src');try{n.load();}catch(_){}}else if(n.tagName==='IMG'){const u=n.currentSrc||n.src||'';detach(n,u);n.removeAttribute('src');}}catch(_){}}function patchSrc(Ctor){const pd=Object.getOwnPropertyDescriptor(Ctor.prototype,'src');if(!pd||!pd.set)return;Object.defineProperty(Ctor.prototype,'src',{get(){return pd.get.call(this)},set(v){const old=pd.get.call(this);if(old&&old!==v)detach(this,old);const ret=pd.set.call(this,v);attach(this,v);return ret;}});}patchSrc(W.HTMLImageElement);patchSrc(W.HTMLVideoElement);const v=D.getElementById('viewer');if(v){const mo=new W.MutationObserver(muts=>{for(const m of muts){if(m.type==='childList'){m.removedNodes&&m.removedNodes.forEach(n=>{const st=[n];while(st.length){const x=st.pop();if(x&&x.nodeType===1){if(x.tagName==='IMG'||x.tagName==='VIDEO')clearNode(x);if(x.childNodes&&x.childNodes.length)st.push(...x.childNodes);}}});}else if(m.type==='attributes'&&(m.target.tagName==='IMG'||m.target.tagName==='VIDEO')&&m.attributeName==='src'){const old=m.oldValue||'';if(/^blob:/.test(old))detach(m.target,old);}}});mo.observe(v,{subtree:true,childList:true,attributes:true,attributeFilter:['src'],attributeOldValue:true});}W.addEventListener('pagehide',()=>{try{D.querySelectorAll('img[src^=\\\"blob:\\\"],video[src^=\\\"blob:\\\"]').forEach(clearNode);}catch(_){}for(const u of Array.from(urlRefs.keys())){try{W.URL.revokeObjectURL(u);}catch(_){}urlRefs.delete(u);}},{once:false});})();const ORDER=['z_assets/js/data.js','z_assets/js/utils.js','z_assets/js/playback.js','z_assets/js/overlays.js','z_assets/js/layout.js','z_assets/js/modeui.js','z_assets/js/main.js'];const btn=D.getElementById('_ugo_pick_btn');const hint=D.getElementById('_ugo_hint');const input=D.createElement('input');input.type='file';input.webkitdirectory=true;input.multiple=true;D.body.appendChild(input);function mapFiles(list){const m=new Map();for(const f of list){const p=(f.webkitRelativePath||f.name);m.set(p.split('\\\\').join('/'),f);}return m;}function findBySuffix(m,rel){const t=String(rel).split('\\\\').join('/');for(const [k,v] of m.entries()){if(k.endsWith(t))return v;}return null;}function loadBlobScript(file,cb){const u=W.URL.createObjectURL(file);const s=D.createElement('script');s.src=u;s.onload=()=>{W.URL.revokeObjectURL(u);cb&&cb();};s.onerror=()=>{W.URL.revokeObjectURL(u);alert('読み込み失敗:'+file.name);cb&&cb();};D.head.appendChild(s);}function start(files){const v=D.getElementById('viewer');if(!v){alert('viewer初期化失敗');return;}const map=mapFiles(files);W.__UGO_RESOLVE=(rel,sink)=>{if(!rel)return rel;const f=findBySuffix(map,rel);if(f){const u=W.URL.createObjectURL(f);if(Array.isArray(sink))sink.push(u);return u;}const lower=String(rel).toLowerCase();if(/\\.(png|jpe?g|webp|gif)$/i.test(lower)){const c=D.createElement('canvas');c.width=480;c.height=720;const g=c.getContext('2d');g.fillStyle='#222';g.fillRect(0,0,c.width,c.height);g.fillStyle='#fff';g.font='bold 28px system-ui';g.textAlign='center';g.textBaseline='middle';g.fillText('MISSING:'+rel,240,360);const u=c.toDataURL('image/png');if(Array.isArray(sink))sink.push(u);return u;}return '';};const next=(i)=>{if(i>=ORDER.length)return;const js=findBySuffix(map,ORDER[i])||findBySuffix(map,ORDER[i].replace(/^z_assets\\/js\\//,''));if(!js){alert(ORDER[i]+' が見つかりません');return;}loadBlobScript(js,()=>next(i+1));};const data=findBySuffix(map,ORDER[0])||findBySuffix(map,'data.js');if(!data){alert('data.js が見つかりません');return;}loadBlobScript(data,()=>next(1));}btn.onclick=()=>{try{input.showPicker ? input.showPicker():input.click()}catch(_){input.click();}};input.onchange=()=>{btn.remove();if(hint)hint.style.display='none';start([...input.files]);};})();";
+      //const BOOKMARKLET = "javascript:(()=>{const _blankTab=(()=>{try{const h=location.href||'';const o=(location.origin||'').toLowerCase();const t=(document.title||'').toLowerCase();return!h||/^about:/.test(h)||o==='null'||t==='start page'||t==='新規タブ'||t==='スタートページ';}catch(_){return true}})();if(_blankTab){alert('空白タブでは動作しません。\\nThis bookmarklet cannot run on a blank/start page.');return;}const W=window.open('about:blank','_blank');if(!W){alert('ポップアップがブロックされています。\\nPopup has been blocked.');return;}const D=W.document;D.open();D.write(\"<!doctype html><html lang='ja'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1,viewport-fit=cover'><title>uGo-Man</title><style>html,body{margin:0;height:100%;background:#000;overflow:hidden}#viewer{position:fixed;inset:0;background:#000;z-index:1}#viewer img,#viewer video{max-width:100%;max-height:100%;object-fit:contain;display:block;margin:auto;-webkit-user-select:none;user-select:none;-webkit-user-drag:none}#ui{position:fixed;left:0;right:0;bottom:0;z-index:9999;display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px}#ui button{height:44px;padding:0 14px;border:1px solid #888;border-radius:6px;background:#fff;font:14px system-ui;cursor:pointer}.overlay{position:absolute;left:0;top:0;width:100%;height:100%;display:none;z-index:4}.hotspot{position:absolute;left:0;top:0;width:100%;height:100%;z-index:3;background:transparent;cursor:pointer}.marker{position:absolute;z-index:5;pointer-events:none}.marker .dot{width:var(--dot-size,12px);height:var(--dot-size,12px);background:#000;outline:1px solid #fff;border-radius:0;margin-bottom:var(--dot-gap,9px)}#_ugo_hint{color:#ddd;font:12px/1.4 system-ui;text-align:center;opacity:.95}</style></head><body><div id='viewer'></div><div id='ui'><div id='_ugo_hint'>index.html のあるフォルダを指定してください<br><small>Please select the folder that contains<code>index.html</code>.</small></div><button id='_ugo_pick_btn'>フォルダを選ぶ<br>Select Folder</button></div></body></html>\");D.close();const origCreate=D.createElement.bind(D);D.createElement=(t,...a)=>{const el=origCreate(t,...a);if(String(t).toLowerCase()==='video'){el.setAttribute('playsinline','');el.muted=true;el.preload='metadata';}return el;};(function(){const urlRefs=new Map();function attach(n,u){if(!u||!/^blob:/.test(u))return;let s=urlRefs.get(u);if(!s){s=new Set();urlRefs.set(u,s);}s.add(n);}function detach(n,u){if(!u||!/^blob:/.test(u))return;const s=urlRefs.get(u);if(!s)return;s.delete(n);if(s.size===0){urlRefs.delete(u);try{W.URL.revokeObjectURL(u);}catch(_){}}}function clearNode(n){try{if(n.tagName==='VIDEO'){try{n.pause();}catch(_){}const u=n.currentSrc||n.src||'';detach(n,u);n.removeAttribute('src');try{n.load();}catch(_){}}else if(n.tagName==='IMG'){const u=n.currentSrc||n.src||'';detach(n,u);n.removeAttribute('src');}}catch(_){}}function patchSrc(Ctor){const pd=Object.getOwnPropertyDescriptor(Ctor.prototype,'src');if(!pd||!pd.set)return;Object.defineProperty(Ctor.prototype,'src',{get(){return pd.get.call(this)},set(v){const old=pd.get.call(this);if(old&&old!==v)detach(this,old);const ret=pd.set.call(this,v);attach(this,v);return ret;}});}patchSrc(W.HTMLImageElement);patchSrc(W.HTMLVideoElement);const v=D.getElementById('viewer');if(v){const mo=new W.MutationObserver(muts=>{for(const m of muts){if(m.type==='childList'){m.removedNodes&&m.removedNodes.forEach(n=>{const st=[n];while(st.length){const x=st.pop();if(x&&x.nodeType===1){if(x.tagName==='IMG'||x.tagName==='VIDEO')clearNode(x);if(x.childNodes&&x.childNodes.length)st.push(...x.childNodes);}}});}else if(m.type==='attributes'&&(m.target.tagName==='IMG'||m.target.tagName==='VIDEO')&&m.attributeName==='src'){const old=m.oldValue||'';if(/^blob:/.test(old))detach(m.target,old);}}});mo.observe(v,{subtree:true,childList:true,attributes:true,attributeFilter:['src'],attributeOldValue:true});}W.addEventListener('pagehide',()=>{try{D.querySelectorAll('img[src^=\\\"blob:\\\"],video[src^=\\\"blob:\\\"]').forEach(clearNode);}catch(_){}for(const u of Array.from(urlRefs.keys())){try{W.URL.revokeObjectURL(u);}catch(_){}urlRefs.delete(u);}},{once:false});})();const ORDER=['z_assets/js/data.js','z_assets/js/utils.js','z_assets/js/playback.js','z_assets/js/overlays.js','z_assets/js/layout.js','z_assets/js/modeui.js','z_assets/js/main.js'];const btn=D.getElementById('_ugo_pick_btn');const hint=D.getElementById('_ugo_hint');const input=D.createElement('input');input.type='file';input.webkitdirectory=true;input.multiple=true;D.body.appendChild(input);function mapFiles(list){const m=new Map();for(const f of list){const p=(f.webkitRelativePath||f.name);m.set(p.split('\\\\').join('/'),f);}return m;}function findBySuffix(m,rel){const t=String(rel).split('\\\\').join('/');for(const [k,v] of m.entries()){if(k.endsWith(t))return v;}return null;}function loadBlobScript(file,cb){const u=W.URL.createObjectURL(file);const s=D.createElement('script');s.src=u;s.onload=()=>{W.URL.revokeObjectURL(u);cb&&cb();};s.onerror=()=>{W.URL.revokeObjectURL(u);alert('読み込み失敗:'+file.name);cb&&cb();};D.head.appendChild(s);}function start(files){const v=D.getElementById('viewer');if(!v){alert('viewer初期化失敗');return;}const map=mapFiles(files);W.__UGO_RESOLVE=(rel,sink)=>{if(!rel)return rel;const f=findBySuffix(map,rel);if(f){const u=W.URL.createObjectURL(f);if(Array.isArray(sink))sink.push(u);return u;}const lower=String(rel).toLowerCase();if(/\\.(png|jpe?g|webp|gif)$/i.test(lower)){const c=D.createElement('canvas');c.width=480;c.height=720;const g=c.getContext('2d');g.fillStyle='#222';g.fillRect(0,0,c.width,c.height);g.fillStyle='#fff';g.font='bold 28px system-ui';g.textAlign='center';g.textBaseline='middle';g.fillText('MISSING:'+rel,240,360);const u=c.toDataURL('image/png');if(Array.isArray(sink))sink.push(u);return u;}return '';};const next=(i)=>{if(i>=ORDER.length)return;const js=findBySuffix(map,ORDER[i])||findBySuffix(map,ORDER[i].replace(/^z_assets\\/js\\//,''));if(!js){alert(ORDER[i]+' が見つかりません');return;}loadBlobScript(js,()=>next(i+1));};const data=findBySuffix(map,ORDER[0])||findBySuffix(map,'data.js');if(!data){alert('data.js が見つかりません');return;}loadBlobScript(data,()=>next(1));}btn.onclick=()=>{try{input.showPicker ? input.showPicker():input.click()}catch(_){input.click();}};input.onchange=()=>{btn.remove();if(hint)hint.style.display='none';start([...input.files]);};})();";
+
+      function showMessage(msg) {
+        let box = document.getElementById('_msg');
+        if (!box) {
+          box = document.createElement('div');
+          box.id = '_msg';
+          Object.assign(box.style, {
+            position: 'fixed', bottom: '20px', left: '50%',
+            transform: 'translateX(-50%)',
+            background: 'rgba(0,0,0,0.85)', color: '#fff',
+            padding: '10px 16px', borderRadius: '8px',
+            fontSize: '14px', zIndex: 99999, transition: 'opacity 0.4s'
+          });
+          document.body.appendChild(box);
+        }
+        box.textContent = msg;
+        box.style.opacity = '1';
+        clearTimeout(box._timer);
+        box._timer = setTimeout(() => { box.style.opacity = '0'; }, 2500);
+      }
+
+      const copyBtn = document.getElementById("copyBM");
+      if (copyBtn) {
+        copyBtn.addEventListener("click", async () => {
+          try {
+            await navigator.clipboard.writeText(BOOKMARKLET);
+            const lang = navigator.language || "en";
+            const cur = /^ja\b/i.test(lang) ? "ja" : "en";
+            showMessage(cur === "ja"
+              ? "ブックマークレットをコピーしました。"
+              : "Bookmarklet copied.");
+          } catch (_) {
+
+          }
+        });
+      }
+
+
+
+
+      // --- iOS detection (for webkitdirectory availability) ---
+      function getIOSVersion() {
+        const ua = navigator.userAgent || "";
+        // 例: "OS 18_4 like Mac OS X", "CPU iPhone OS 26_0 like Mac OS X"
+        const m = ua.match(/OS\s+(\d+)[._](\d+)/i);
+        if (m) {
+          const major = parseInt(m[1], 10);
+          const minor = parseInt(m[2], 10);
+          if (!Number.isNaN(major) && !Number.isNaN(minor)) {
+            return parseFloat(`${major}.${minor}`);
+          }
+        }
+        return NaN; // 取れなければ NaN（この場合はブロックしない方針）
+      }
       // ★ 追加：一度だけ出すアラート
       const panicOnce = (() => {
         let fired = false, bucket = [];
@@ -245,6 +356,12 @@
           if (immediateStop) throw new Error("panicOnce-stop");
         };
       })();
+      // iPhone向けに「フォルダに入って『開く』」ガイダンスを上書き
+      function isIOSLike() {
+        const ua = navigator.userAgent || "";
+        // iPhone/iPad/iPod, もしくは iPadOS が MacっぽいUAを名乗るケース
+        return /iPhone|iPad|iPod/i.test(ua) || (/\bMacintosh\b/.test(ua) && navigator.maxTouchPoints > 1);
+      }
 
       // ★ 追加：簡易画像プレースホルダ（同期・dataURL）
       function makeImagePlaceholderDataURL(label = "MISSING", w = 800, h = 1200) {
@@ -420,7 +537,7 @@
           }
         }
 
-      }, { once: true });
+      });
     })();
   </script>
 </body>
