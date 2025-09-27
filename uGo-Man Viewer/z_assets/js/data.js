@@ -275,7 +275,7 @@ window.__UGOMAN_DATA__ = {
             "62.8%"
           ],
           "rotate": 0,
-          "end": "loop"  // "loop"=ループ, "hold"=最終フレームで静止, "hide"=終了で非表示, "reset"=先頭戻し
+          "end": "hold"  // "loop"=ループ, "hold"=最終フレームで静止, "hide"=終了で非表示, "reset"=先頭戻し
         }
       ],
       "__blobs": []

@@ -317,24 +317,69 @@
         }
     });
 
-    // スワイプ：左→右で次（日本の漫画の読方向に合わせる）
-    let touchX = null, touchY = null;
+    // スワイプ
+    // ===== スワイプ判定用パラメータ =====
+    const SWIPE_DIST_FRAC = 0.12;   // 画面幅の 12% 以上で候補
+    const SWIPE_DIST_MIN = 60;     // 下限(px)
+    const SWIPE_DIST_MAX = 220;    // 上限(px)
+    const SWIPE_EDGE_PAD = 12;     // 端のエッジジェスチャ除外(px)
+
+    const SWIPE_MAX_TIME = 350;    // ms：これより長いとドラッグ扱い
+    const SWIPE_MIN_VELOC = 0.35;   // px/ms：最低速度 ≒ 350px/s
+    const SWIPE_ORTHO_RATIO = 1.2;    // 横成分が縦成分より1.2倍以上で有効
+
+    const SWIPE_LONG_TAP = 250;    // ms：長押し判定
+
+    let touch = null;
+
     viewer.addEventListener("touchstart", (e) => {
         const t = e.changedTouches[0];
-        touchX = t.clientX; touchY = t.clientY;
+        touch = {
+            sx: t.clientX, sy: t.clientY,
+            t0: performance.now(),
+            moved: false,
+            longTimer: setTimeout(() => { if (touch) touch.longHold = true; }, SWIPE_LONG_TAP),
+            edgeBlocked: (t.clientX < SWIPE_EDGE_PAD || t.clientX > window.innerWidth - SWIPE_EDGE_PAD)
+        };
     }, { passive: true });
-    viewer.addEventListener("touchend", (e) => {
-        const t = e.changedTouches[0];
-        if (touchX == null) return;
-        const dx = t.clientX - touchX;
-        const dy = t.clientY - touchY;
-        touchX = touchY = null;
 
-        if (Math.abs(dx) > Math.max(50, Math.abs(dy))) {
-            if (dx > 0) nextPage(); // 左→右 = 次
-            else prevPage();        // 右→左 = 戻る
+    viewer.addEventListener("touchmove", (e) => {
+        if (!touch) return;
+        const t = e.changedTouches[0];
+        const dx = t.clientX - touch.sx;
+        const dy = t.clientY - touch.sy;
+        if (Math.abs(dx) > 2 || Math.abs(dy) > 2) touch.moved = true;
+    }, { passive: true });
+
+    viewer.addEventListener("touchend", (e) => {
+        const T = touch; touch = null;
+        if (!T) return;
+        clearTimeout(T.longTimer);
+        if (T.edgeBlocked) return;
+
+        const t = e.changedTouches[0];
+        const dx = t.clientX - T.sx;
+        const dy = t.clientY - T.sy;
+        const dt = Math.max(1, performance.now() - T.t0);
+        const ax = Math.abs(dx), ay = Math.abs(dy);
+        const v = ax / dt;
+
+        // 画面幅×割合を距離しきい値に、さらに MIN/MAX でクランプ
+        const px = Math.round(window.innerWidth * SWIPE_DIST_FRAC);
+        const SWIPE_MIN_DIST = Math.min(SWIPE_DIST_MAX, Math.max(SWIPE_DIST_MIN, px));
+
+        if (T.longHold && ax < SWIPE_MIN_DIST * 2) return;
+
+        const isFast = (dt <= SWIPE_MAX_TIME && v >= SWIPE_MIN_VELOC && ax >= SWIPE_MIN_DIST);
+        const isHoriz = (ax > ay * SWIPE_ORTHO_RATIO);
+
+        if (isFast && isHoriz) {
+            if (dx > 0) nextPage();
+            else prevPage();
         }
     }, { passive: true });
+
+
 
     window.addEventListener("resize", render);
     ModeUI.setOnChange((nextMode) => {
